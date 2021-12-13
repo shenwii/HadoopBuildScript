@@ -1,0 +1,108 @@
+#apache软件镜像地址
+APACHE_MIRRORS="https://mirrors.tuna.tsinghua.edu.cn/apache"
+
+#Zookeeper版本
+ZOOKEEPER_VERSION="3.7.0"
+#Zookeeper节点，用空格分割
+ZOOKEEPER_NODES="node1 node2 node3"
+#Zookeeper用户名
+ZOOKEEPER_USER="zookeeper"
+#Zookeeper的HOME目录
+ZOOKEEPER_USER_HOME="/var/lib/${ZOOKEEPER_USER}"
+#Zookeeper端口
+ZOOKEEPER_CLIENT_PORT="2181"
+#Zookeeper的DATA目录
+ZOOKEEPER_DATA_DIR="${ZOOKEEPER_USER_HOME}/data"
+
+#Hadoop版本
+HADOOP_VERSION=3.2.2
+#Hadoop用户名
+HADOOP_USER="hadoop"
+#Hadoop的HOME目录
+HADOOP_USER_HOME="/var/lib/${HADOOP_USER}"
+#Hadoop的安装目录
+HADOOP_HOME="$HADOOP_USER_HOME/hadoop"
+#Hadoop的临时目录
+HADOOP_TMP_DIR="$HADOOP_HOME/tmp"
+#Hadoop的journal目录
+HADOOP_JOURNAL_DIR="$HADOOP_TMP_DIR/dfs/journalnode/"
+#Hadoop的HDFS集群ID
+HADOOP_HDFS_NAMESERVICES="hdfs-cluster"
+#Hadoop的HDFS集群地址
+HADOOP_HDFS_CLUSTER="hdfs://${HADOOP_HDFS_NAMESERVICES}"
+#Hadoop的YARN集群ID
+HADOOP_YARN_CLUSTER_ID="yarn-cluster"
+#Hadoop的name node节点，用空格分割
+HADOOP_CLUSTER_NAMENODES="node1 node2"
+#Hadoop的journal node节点，用空格分割
+HADOOP_CLUSTER_JOURNALNODES="node2 node3"
+#Hadoop的resource manager节点，用空格分割
+HADOOP_CLUSTER_RESOURCEMANAGERS="node1 node3"
+#Hadoop的job history node
+HADOOP_JOBHISTORY_NODE="node2"
+#YARN可分配的最大内存，这里设置的是最大内存的80%，可以自行调整
+HADOOP_MAX_MEM="$(free -m | grep Mem | awk '{print $2}')"
+HADOOP_MAX_MEM="$((${HADOOP_MAX_MEM}*80/100))"
+
+#Hive版本
+HIVE_VERSION="3.1.2"
+#Hive用户名(和Hadoop保持一致，最好别改)
+HIVE_USER="$HADOOP_USER"
+#Hive的HOME目录(和Hadoop保持一致，最好别改)
+HIVE_USER_HOME="$HADOOP_USER_HOME"
+#Hive的安装目录
+HIVE_HOME="$HIVE_USER_HOME/hive"
+#MySQL的JDBC驱动版本
+HIVE_MYSQL_DRIVER_VERSION="8.0.27"
+#MySQL的JDBC驱动
+HIVE_MYSQL_DRIVER="com.mysql.cj.jdbc.Driver"
+#MySQL的连接URL
+HIVE_MYSQL_URL="jdbc:mysql://node1:3306/hive?autoReconnect=true&amp;serverTimezone=Asia/Shanghai&amp;useSSL=false&amp;allowMultiQueries=true"
+#MySQL的用户名
+HIVE_MYSQL_USER="hive"
+#MySQL的密码
+HIVE_MYSQL_PASSWD="hive123"
+
+#Hbase版本
+HBASE_VERSION="2.3.7"
+#Hbase用户名(和Hadoop保持一致，最好别改)
+HBASE_USER="$HADOOP_USER"
+#Hbase的HOME目录(和Hadoop保持一致，最好别改)
+HBASE_USER_HOME="$HADOOP_USER_HOME"
+#Hbase的安装目录
+HBASE_HOME="$HIVE_USER_HOME/hbase"
+
+#JAVA的HOME目录（动态）
+JAVA_HOME="$(realpath "$(which java)" | sed 's:/bin/java$::')"
+
+#创建用户
+create_user() {
+    local user_name="$1"
+    local user_home="$2"
+    if ! cat /etc/passwd | grep -q "${user_name}:"; then
+        useradd --home-dir "${user_home}" --create-home --shell /bin/bash $user_name
+        echo "create password for $user_name:"
+        passwd $user_name
+    fi
+}
+
+#下载apache软件
+download_apache_software() {
+    local path="$1"
+    local user="$2"
+    local install_dir="$3"
+    local tmp_file="/tmp/$(basename "$path")"
+    wget "${APACHE_MIRRORS}/${path}" -O ${tmp_file} >/dev/null
+    cd "$install_dir"
+    local tar_log="$(runuser -u $2 -- tar -xvf ${tmp_file})"
+    echo "$tar_log" | head -n 1 | awk -F/ '{print $1}'
+    rm -f ${tmp_file} >/dev/null 2>&1
+}
+
+#检测是否为Root用户
+check_root() {
+    if ! [ "$(id -u)" = 0 ]; then
+        echo "use root run it."
+        exit 1
+    fi
+}
