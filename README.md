@@ -68,7 +68,7 @@ hostnamectl set-hostname xxx
 yum install java-1.8.0-openjdk
 #deb系
 apt install openjdk-8-jdk
-#不同发行版直接包名可能略有不同，可以自行google
+#不同发行版之间包名可能略有不同，可以自行google
 ```
 
 如果发行版不带JDK，则可以通过`install_jdk8.sh`安装
@@ -101,7 +101,7 @@ systemctl enable zookeeper
 ./hadoop.sh install
 ```
 
-安装了hadoop之后，会创建hadoop用户，此时可以先配置各个节点直接的免密登入
+安装了hadoop之后，会创建hadoop用户，此时可以先配置各个节点之间的免密登入
 
 ```shell
 #以node1为例
@@ -213,14 +213,23 @@ hive需要使用mysql或者其他数据库储存元数据，这里以mysql为例
 首先确认下`env`文件中的mysql连接方式是否正确
 
 >#MySQL的JDBC驱动版本
+>
 >HIVE_MYSQL_DRIVER_VERSION="8.0.27"
+>
 >#MySQL的JDBC驱动
+>
 >HIVE_MYSQL_DRIVER="com.mysql.cj.jdbc.Driver"
+>
 >#MySQL的连接URL
+>
 >HIVE_MYSQL_URL="jdbc:mysql://node1:3306/hive?autoReconnect=true&amp;serverTimezone=Asia/Shanghai&amp;useSSL=false&amp;allowMultiQueries=true"
+>
 >#MySQL的用户名
+>
 >HIVE_MYSQL_USER="hive"
+>
 >#MySQL的密码
+>
 >HIVE_MYSQL_PASSWD="hive123"
 
 确认无误后，配置hive
@@ -257,7 +266,7 @@ systemctl start hbase
 #查看服务状态
 systemctl status hbase
 #配置开机自启
-#如果在各个hbase节点直接配置了免密登入，节点之间应该可以互相启动，所以开机自启请自行测试
+#如果在各个hbase节点之间配置了免密登入，节点之间应该可以互相启动，所以开机自启请自行测试
 systemctl enable hbase
 ```
 
