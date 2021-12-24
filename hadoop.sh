@@ -19,7 +19,7 @@ _format_zk() {
 }
 
 _systemd_script() {
-    cat >/lib/systemd/system/hdfs@.service <<EOF
+    cat >/usr/lib/systemd/system/hdfs@.service <<EOF
 [Unit]
 Description=The Hadoop HDFS Server
 After=network.target
@@ -36,7 +36,7 @@ Restart=on-failure
 WantedBy=multi-user.target
 EOF
 
-    cat >/lib/systemd/system/yarn@.service <<EOF
+    cat >/usr/lib/systemd/system/yarn@.service <<EOF
 [Unit]
 Description=The Hadoop YARN Server
 After=network.target
@@ -53,7 +53,7 @@ Restart=on-failure
 WantedBy=multi-user.target
 EOF
 
-    cat >/lib/systemd/system/mapred@.service <<EOF
+    cat >/usr/lib/systemd/system/mapred@.service <<EOF
 [Unit]
 Description=The Hadoop MAPRED Server
 After=network.target
@@ -73,16 +73,19 @@ EOF
 }
 
 _reconfig() {
-    runuser -u ${HADOOP_USER} -- touch "$HADOOP_HOME/etc/hadoop/hadoop-env.sh"
-    echo "export JAVA_HOME=$JAVA_HOME" >"$HADOOP_HOME/etc/hadoop/hadoop-env.sh"
-    echo "export HADOOP_HOME=$HADOOP_HOME" >>"$HADOOP_HOME/etc/hadoop/hadoop-env.sh"
-    echo "export HDFS_NAMENODE_USER=${HADOOP_USER}" >>"$HADOOP_HOME/etc/hadoop/hadoop-env.sh"
-    echo "export HDFS_DATANODE_USER=${HADOOP_USER}" >>"$HADOOP_HOME/etc/hadoop/hadoop-env.sh"
-    echo "export HDFS_SECONDARYNAMENODE_USER=${HADOOP_USER}" >>"$HADOOP_HOME/etc/hadoop/hadoop-env.sh"
-    echo "export HDFS_ZKFC_USER=${HADOOP_USER}" >>"$HADOOP_HOME/etc/hadoop/hadoop-env.sh"
-    echo "export HDFS_JOURNALNODE_USER=${HADOOP_USER}" >>"$HADOOP_HOME/etc/hadoop/hadoop-env.sh"
-    echo "export YARN_RESOURCEMANAGER_USER=${HADOOP_USER}" >>"$HADOOP_HOME/etc/hadoop/hadoop-env.sh"
-    echo "export YARN_NODEMANAGER_USER=${HADOOP_USER}" >>"$HADOOP_HOME/etc/hadoop/hadoop-env.sh"
+    touch "$HADOOP_HOME/etc/hadoop/hadoop-env.sh"
+    cat >"$HADOOP_HOME/etc/hadoop/hadoop-env.sh" <<EOF
+export JAVA_HOME=$JAVA_HOME
+export HADOOP_HOME=$HADOOP_HOME
+export HADOOP_LOG_DIR=${HADOOP_USER_HOME}/logs
+export HDFS_NAMENODE_USER=${HADOOP_USER}
+export HDFS_DATANODE_USER=${HADOOP_USER}
+export HDFS_SECONDARYNAMENODE_USER=${HADOOP_USER}
+export HDFS_ZKFC_USER=${HADOOP_USER}
+export HDFS_JOURNALNODE_USER=${HADOOP_USER}
+export YARN_RESOURCEMANAGER_USER=${HADOOP_USER}
+export YARN_NODEMANAGER_USER=${HADOOP_USER}
+EOF
 
     local i=1
     local quorum=""
@@ -97,7 +100,6 @@ _reconfig() {
         local i=$((i+1))
     done
 
-    runuser -u ${HADOOP_USER} -- touch "$HADOOP_HOME/etc/hadoop/core-site.xml"
     cat >"$HADOOP_HOME/etc/hadoop/core-site.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
@@ -160,7 +162,6 @@ EOF
         local i=$((i+1))
     done
 
-    runuser -u ${HADOOP_USER} -- touch "$HADOOP_HOME/etc/hadoop/hdfs-site.xml"
     cat <<EOF >"$HADOOP_HOME/etc/hadoop/hdfs-site.xml"
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
@@ -172,6 +173,11 @@ EOF
     <property>
         <name>dfs.ha.namenodes.${HADOOP_HDFS_NAMESERVICES}</name>
         <value>${nns}</value>
+    </property>
+
+    <property>
+        <name>dfs.datanode.data.dir</name>
+        <value>${HADOOP_DATA_DIRS}</value>
     </property>
 
 EOF
@@ -235,7 +241,6 @@ EOF
 </configuration>
 EOF
 
-    runuser -u ${HADOOP_USER} -- touch "$HADOOP_HOME/etc/hadoop/mapred-site.xml"
     cat <<EOF >"$HADOOP_HOME/etc/hadoop/mapred-site.xml"
 <?xml version="1.0"?>
 <configuration>
@@ -283,7 +288,6 @@ EOF
         local i=$((i+1))
     done
 
-    runuser -u ${HADOOP_USER} -- touch "$HADOOP_HOME/etc/hadoop/yarn-site.xml"
     cat <<EOF >"$HADOOP_HOME/etc/hadoop/yarn-site.xml"
 <?xml version="1.0"?>
 <configuration>
@@ -380,10 +384,14 @@ EOF
 }
 
 _install() {
-    create_user "$HADOOP_USER" "$HADOOP_USER_HOME"
-    dirname="$(download_apache_software "/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}.tar.gz" "$HADOOP_USER" "$HADOOP_USER_HOME")"
-    cd "$HADOOP_USER_HOME"
-    runuser -u "$HADOOP_USER" -- ln -fs "$dirname" "$(basename "$HADOOP_HOME")"
+    create_user "$HADOOP_USER" "0"
+    if ! [ -d "$HADOOP_USER_HOME" ]; then
+        mkdir -p "$HADOOP_USER_HOME"
+        chown "$HADOOP_USER:$HADOOP_USER" "$HADOOP_USER_HOME"
+    fi
+    if [ -d "$HADOOP_HOME" ]; then rm -rf "$HADOOP_HOME"; fi
+    dirname="$(download_apache_software "/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}.tar.gz" "$(dirname "$HADOOP_HOME")")"
+    mv "$(dirname "$HADOOP_HOME")/${dirname}" "$HADOOP_HOME"
     _reconfig
 }
 

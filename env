@@ -8,22 +8,26 @@ ZOOKEEPER_NODES="node1 node2 node3"
 #Zookeeper用户名
 ZOOKEEPER_USER="zookeeper"
 #Zookeeper的HOME目录
-ZOOKEEPER_USER_HOME="/var/lib/${ZOOKEEPER_USER}"
+ZOOKEEPER_USER_HOME="/var/lib/zookeeper"
 #Zookeeper端口
 ZOOKEEPER_CLIENT_PORT="2181"
 #Zookeeper的DATA目录
 ZOOKEEPER_DATA_DIR="${ZOOKEEPER_USER_HOME}/data"
+#Zookeeper的安装目录
+ZOOKEEPER_HOME="/opt/zookeeper"
 
 #Hadoop版本
 HADOOP_VERSION=3.2.2
 #Hadoop用户名
 HADOOP_USER="hadoop"
 #Hadoop的HOME目录
-HADOOP_USER_HOME="/var/lib/${HADOOP_USER}"
+HADOOP_USER_HOME="/var/lib/hadoop"
 #Hadoop的安装目录
-HADOOP_HOME="$HADOOP_USER_HOME/hadoop"
+HADOOP_HOME="/opt/hadoop"
 #Hadoop的临时目录
-HADOOP_TMP_DIR="$HADOOP_HOME/tmp"
+HADOOP_TMP_DIR="$HADOOP_USER_HOME/tmp"
+#Hadoop的数据目录（多个以逗号分割）
+HADOOP_DATA_DIRS="${HADOOP_USER_HOME}/data"
 #Hadoop的journal目录
 HADOOP_JOURNAL_DIR="$HADOOP_TMP_DIR/dfs/journalnode/"
 #Hadoop的HDFS集群ID
@@ -48,10 +52,10 @@ HADOOP_MAX_MEM="$((${HADOOP_MAX_MEM}*80/100))"
 HIVE_VERSION="3.1.2"
 #Hive用户名(和Hadoop保持一致，最好别改)
 HIVE_USER="$HADOOP_USER"
-#Hive的HOME目录(和Hadoop保持一致，最好别改)
-HIVE_USER_HOME="$HADOOP_USER_HOME"
+#Hive的HOME目录
+HIVE_USER_HOME="/var/lib/hive"
 #Hive的安装目录
-HIVE_HOME="$HIVE_USER_HOME/hive"
+HIVE_HOME="/opt/hive"
 #MySQL的JDBC驱动版本
 HIVE_MYSQL_DRIVER_VERSION="8.0.27"
 #MySQL的JDBC驱动
@@ -67,10 +71,10 @@ HIVE_MYSQL_PASSWD="hive123"
 HBASE_VERSION="2.3.7"
 #Hbase用户名(和Hadoop保持一致，最好别改)
 HBASE_USER="$HADOOP_USER"
-#Hbase的HOME目录(和Hadoop保持一致，最好别改)
-HBASE_USER_HOME="$HADOOP_USER_HOME"
+#Hbase的HOME目录
+HBASE_USER_HOME="/var/lib/hbase"
 #Hbase的安装目录
-HBASE_HOME="$HIVE_USER_HOME/hbase"
+HBASE_HOME="/opt/hbase"
 
 #JAVA的HOME目录（动态）
 JAVA_HOME="$(realpath "$(which java)" | sed 's:/bin/java$::')"
@@ -78,23 +82,31 @@ JAVA_HOME="$(realpath "$(which java)" | sed 's:/bin/java$::')"
 #创建用户
 create_user() {
     local user_name="$1"
-    local user_home="$2"
+    local user_home="/var/lib/$user_name"
+    if [ -z "$2" ]; then
+        local is_sys_user=1
+    else
+        local is_sys_user="$2"
+    fi
     if ! cat /etc/passwd | grep -q "${user_name}:"; then
-        useradd --home-dir "${user_home}" --create-home --shell /bin/bash $user_name
-        echo "create password for $user_name:"
-        passwd $user_name
+        if [ "$is_sys_user" = "1" ]; then
+            useradd --system --no-create-home --home-dir "${user_home}" --shell /usr/sbin/nologin $user_name
+        else
+            useradd --home-dir "${user_home}" --no-create-home --shell /bin/bash $user_name
+            echo "create password for $user_name:"
+            passwd $user_name
+        fi
     fi
 }
 
 #下载apache软件
 download_apache_software() {
     local path="$1"
-    local user="$2"
-    local install_dir="$3"
-    local tmp_file="/tmp/$(basename "$path")"
+    local install_dir="$2"
+    local tmp_file="$HOME/$(basename "$path")"
     wget "${APACHE_MIRRORS}/${path}" -O ${tmp_file} >/dev/null
     cd "$install_dir"
-    local tar_log="$(runuser -u $2 -- tar -xvf ${tmp_file})"
+    local tar_log="$(tar --no-same-owner -xvf ${tmp_file})"
     echo "$tar_log" | head -n 1 | awk -F/ '{print $1}'
     rm -f ${tmp_file} >/dev/null 2>&1
 }

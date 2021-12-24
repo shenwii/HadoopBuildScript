@@ -7,7 +7,7 @@ set -e
 check_root
 
 _systemd_script() {
-    cat >/lib/systemd/system/hive@.service <<EOF
+    cat >/usr/lib/systemd/system/hive@.service <<EOF
 [Unit]
 Description=The Hadoop HIVE Server
 After=network.target
@@ -25,20 +25,21 @@ EOF
 }
 
 _reconfig() {
-    runuser -u ${HIVE_USER} -- touch "$HIVE_HOME/conf/hive-env.sh"
-    echo "export JAVA_HOME=$JAVA_HOME" >"$HIVE_HOME/conf/hive-env.sh"
-    echo "export HADOOP_HOME=$HADOOP_HOME" >>"$HIVE_HOME/conf/hive-env.sh"
-    echo "export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop" >>"$HIVE_HOME/conf/hive-env.sh"
-    echo "export HIVE_HOME=$HIVE_HOME" >>"$HIVE_HOME/conf/hive-env.sh"
-    echo "export HIVE_CONF_DIR=$HIVE_HOME/conf" >>"$HIVE_HOME/conf/hive-env.sh"
-    echo "export HIVE_AUX_JARS_PATH=$HIVE_HOME/lib" >>"$HIVE_HOME/conf/hive-env.sh"
+    runuser -u ${HIVE_USER} -- mkdir -p ${HIVE_USER_HOME}/tmp/${HIVE_USER}
+    runuser -u ${HIVE_USER} -- mkdir -p ${HIVE_USER_HOME}/logs
 
-    runuser -u ${HIVE_USER} -- mkdir -p ${HIVE_HOME}/tmp/${HIVE_USER}
+    cat >"$HIVE_HOME/conf/hive-env.sh" <<EOF
+export JAVA_HOME=$JAVA_HOME
+export HADOOP_HOME=$HADOOP_HOME
+export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
+export HIVE_HOME=$HIVE_HOME
+export HIVE_CONF_DIR=$HIVE_HOME/conf
+export HIVE_LOG_DIR=${HIVE_USER_HOME}/logs
+export HIVE_AUX_JARS_PATH=$HIVE_HOME/lib
+EOF
 
-    runuser -u ${HIVE_USER} -- touch "$HIVE_HOME/conf/hive-log4j2.properties"
-    echo "property.hive.log.dir=$HIVE_HOME/logs" >"$HIVE_HOME/conf/hive-log4j2.properties"
+    #echo "property.hive.log.dir=$HIVE_HOME/logs" >"$HIVE_HOME/conf/hive-log4j2.properties"
 
-    runuser -u ${HIVE_USER} -- touch "$HIVE_HOME/conf/hive-site.xml"
     cat >"$HIVE_HOME/conf/hive-site.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
@@ -73,25 +74,25 @@ _reconfig() {
 
   <property>
     <name>hive.exec.local.scratchdir</name>
-    <value>${HIVE_HOME}/tmp/${HIVE_USER}</value>
+    <value>${HIVE_USER_HOME}/tmp/${HIVE_USER}</value>
     <description>Local scratch space for Hive jobs</description>
   </property>
 
   <property>
     <name>hive.downloaded.resources.dir</name>
-    <value>${HIVE_HOME}/tmp/\${hive.session.id}_resources</value>
+    <value>${HIVE_USER_HOME}/tmp/\${hive.session.id}_resources</value>
     <description>Temporary local directory for added resources in the remote file system.</description>
   </property>
 
   <property>
     <name>hive.querylog.location</name>
-    <value>${HIVE_HOME}/tmp/${HIVE_USER}</value>
+    <value>${HIVE_USER_HOME}/tmp/${HIVE_USER}</value>
     <description>Location of Hive run time structured log file</description>
   </property>
 
   <property>
     <name>hive.server2.logging.operation.log.location</name>
-    <value>${HIVE_HOME}/tmp/${HIVE_USER}/operation_logs</value>
+    <value>${HIVE_USER_HOME}/tmp/${HIVE_USER}/operation_logs</value>
     <description>Top level directory where operation logs are stored if logging functionality is enabled</description>
   </property>
 
@@ -108,18 +109,22 @@ _reconfig() {
   </property>
 </configuration>
 EOF
-    runuser -u $HIVE_USER -- wget "https://repo1.maven.org/maven2/mysql/mysql-connector-java/${HIVE_MYSQL_DRIVER_VERSION}/mysql-connector-java-${HIVE_MYSQL_DRIVER_VERSION}.jar" -O $HIVE_HOME/lib/mysql-connector-java-${HIVE_MYSQL_DRIVER_VERSION}.jar
+    wget "https://repo1.maven.org/maven2/mysql/mysql-connector-java/${HIVE_MYSQL_DRIVER_VERSION}/mysql-connector-java-${HIVE_MYSQL_DRIVER_VERSION}.jar" -O $HIVE_HOME/lib/mysql-connector-java-${HIVE_MYSQL_DRIVER_VERSION}.jar
     _systemd_script
     systemctl daemon-reload
 }
 
 _install() {
-    create_user "$HIVE_USER" "$HIVE_USER_HOME"
-    dirname="$(download_apache_software "/hive/hive-${HIVE_VERSION}/apache-hive-${HIVE_VERSION}-bin.tar.gz" "$HIVE_USER" "$HIVE_USER_HOME")"
-    cd "$HIVE_USER_HOME"
-    runuser -u "$HIVE_USER" -- ln -fs "$dirname" "$(basename "$HIVE_HOME")"
+    create_user "$HIVE_USER" "0"
+    if ! [ -d "$HIVE_USER_HOME" ]; then
+        mkdir -p "$HIVE_USER_HOME"
+        chown "$HIVE_USER:$HIVE_USER" "$HIVE_USER_HOME"
+    fi
+    if [ -d "$HIVE_HOME" ]; then rm -rf "$HIVE_HOME"; fi
+    dirname="$(download_apache_software "/hive/hive-${HIVE_VERSION}/apache-hive-${HIVE_VERSION}-bin.tar.gz" "$(dirname "$HIVE_HOME")")"
+    mv "$(dirname "$HIVE_HOME")/${dirname}" "$HIVE_HOME"
     rm ${HIVE_HOME}/lib/guava-*.jar
-    runuser -u $HIVE_USER -- cp ${HADOOP_HOME}/share/hadoop/common/lib/guava-*.jar ${HIVE_HOME}/lib/
+    cp ${HADOOP_HOME}/share/hadoop/common/lib/guava-*.jar ${HIVE_HOME}/lib/
     _reconfig
 }
 

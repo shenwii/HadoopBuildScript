@@ -7,7 +7,7 @@ set -e
 check_root
 
 _systemd_script() {
-    cat >/lib/systemd/system/hbase.service <<EOF
+    cat >/usr/lib/systemd/system/hbase.service <<EOF
 [Unit]
 Description=The Hadoop HBASE Server
 After=network.target
@@ -26,16 +26,18 @@ EOF
 }
 
 _reconfig() {
-    runuser -u ${HBASE_USER} -- touch "$HBASE_HOME/conf/hbase-env.sh"
-    runuser -u ${HBASE_USER} -- mkdir -p $HBASE_HOME/tmp
+    runuser -u ${HBASE_USER} -- mkdir -p $HBASE_USER_HOME/tmp
 
     cd $HBASE_HOME/conf
     ln -fs "$HADOOP_HOME/etc/hadoop/core-site.xml" ./
     ln -fs "$HADOOP_HOME/etc/hadoop/hdfs-site.xml" ./
 
-    echo "export JAVA_HOME=${JAVA_HOME}" >"$HBASE_HOME/conf/hbase-env.sh"
-    echo "export HBASE_MANAGES_ZK=false" >>"$HBASE_HOME/conf/hbase-env.sh"
-    echo "export HBASE_DISABLE_HADOOP_CLASSPATH_LOOKUP=true" >>"$HBASE_HOME/conf/hbase-env.sh"
+    cat >"$HBASE_HOME/conf/hbase-env.sh" <<EOF
+export JAVA_HOME=${JAVA_HOME}
+export HBASE_LOG_DIR=$HBASE_USER_HOME/logs
+export HBASE_MANAGES_ZK=false
+export HBASE_DISABLE_HADOOP_CLASSPATH_LOOKUP=true
+EOF
 
     local i=1
     local quorum=""
@@ -50,7 +52,6 @@ _reconfig() {
         local i=$((i+1))
     done
 
-    runuser -u ${HBASE_USER} -- touch "$HBASE_HOME/conf/hbase-site.xml"
     cat >"$HBASE_HOME/conf/hbase-site.xml" <<EOF
 <?xml version="1.0"?>
 <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
@@ -61,7 +62,7 @@ _reconfig() {
   </property>
   <property>
     <name>hbase.tmp.dir</name>
-    <value>$HBASE_HOME/tmp</value>
+    <value>$HBASE_USER_HOME/tmp</value>
   </property>
   <property>
     <name>hbase.unsafe.stream.capability.enforce</name>
@@ -83,10 +84,14 @@ EOF
 }
 
 _install() {
-    create_user "$HBASE_USER" "$HBASE_USER_HOME"
-    dirname="$(download_apache_software "/hbase/${HBASE_VERSION}/hbase-${HBASE_VERSION}-bin.tar.gz" "$HBASE_USER" "$HBASE_USER_HOME")"
-    cd "$HBASE_USER_HOME"
-    runuser -u "$HBASE_USER" -- ln -fs "$dirname" "$(basename "$HBASE_HOME")"
+    create_user "$HBASE_USER" "0"
+    if ! [ -d "$HBASE_USER_HOME" ]; then
+        mkdir -p "$HBASE_USER_HOME"
+        chown "$HBASE_USER:$HBASE_USER" "$HBASE_USER_HOME"
+    fi
+    if [ -d "$HBASE_HOME" ]; then rm -rf "$HBASE_HOME"; fi
+    dirname="$(download_apache_software "/hbase/${HBASE_VERSION}/hbase-${HBASE_VERSION}-bin.tar.gz" "$(dirname "$HIVE_HOME")")"
+    mv "$(dirname "$HBASE_HOME")/${dirname}" "$HBASE_HOME"
     _reconfig
 }
 
