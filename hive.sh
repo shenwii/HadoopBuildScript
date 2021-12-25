@@ -7,7 +7,7 @@ set -e
 check_root
 
 _systemd_script() {
-    cat >/usr/lib/systemd/system/hive@.service <<EOF
+    cat >/etc/systemd/system/hive@.service <<EOF
 [Unit]
 Description=The Hadoop HIVE Server
 After=network.target

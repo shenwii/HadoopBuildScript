@@ -19,7 +19,7 @@ _format_zk() {
 }
 
 _systemd_script() {
-    cat >/usr/lib/systemd/system/hdfs@.service <<EOF
+    cat >/etc/systemd/system/hdfs@.service <<EOF
 [Unit]
 Description=The Hadoop HDFS Server
 After=network.target
@@ -36,7 +36,7 @@ Restart=on-failure
 WantedBy=multi-user.target
 EOF
 
-    cat >/usr/lib/systemd/system/yarn@.service <<EOF
+    cat >/etc/systemd/system/yarn@.service <<EOF
 [Unit]
 Description=The Hadoop YARN Server
 After=network.target
@@ -53,7 +53,7 @@ Restart=on-failure
 WantedBy=multi-user.target
 EOF
 
-    cat >/usr/lib/systemd/system/mapred@.service <<EOF
+    cat >/etc/systemd/system/mapred@.service <<EOF
 [Unit]
 Description=The Hadoop MAPRED Server
 After=network.target

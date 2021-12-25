@@ -7,7 +7,7 @@ set -e
 check_root
 
 _systemd_script() {
-    cat >/usr/lib/systemd/system/zookeeper.service <<EOF
+    cat >/etc/systemd/system/zookeeper.service <<EOF
 [Unit]
 Description=The Zookeeper Server
 After=network.target

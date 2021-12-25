@@ -7,7 +7,7 @@ set -e
 check_root
 
 _systemd_script() {
-    cat >/usr/lib/systemd/system/hbase.service <<EOF
+    cat >/etc/systemd/system/hbase.service <<EOF
 [Unit]
 Description=The Hadoop HBASE Server
 After=network.target
