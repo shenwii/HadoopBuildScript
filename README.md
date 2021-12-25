@@ -30,7 +30,7 @@
 
 ```shell
 #xxx为主机名
-hostnamectl set-hostname xxx
+hostnamectl hostname xxx
 ```
 
 不同Linux发行版修改主机名方法可能不同，如果不同的请自行google
